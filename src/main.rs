@@ -59,6 +59,15 @@ mod ffi {
     }
 }
 
+impl ffi::ParameterBlock {
+    fn from_var(var: &ffi::DecisionVariable) -> Self {
+        Self {
+            size: var.v.len() as i32,
+            ptr: var.v.as_ptr(),
+        }
+    }
+}
+
 fn main() {
     let options = ffi::new_solver_options();
 
@@ -66,16 +75,22 @@ fn main() {
 
     problem.pin_mut().add_cost_terms(
         |manager: core::pin::Pin<&mut ffi::CostManager>, vars: &Vec<ffi::DecisionVariable>| {
-            let parameter_blocks: Vec<ffi::ParameterBlock> = vec![ffi::ParameterBlock {
-                size: vars[0].v.len() as i32,
-                ptr: vars[0].v.as_ptr(),
-            }];
+            let parameter_blocks: Vec<ffi::ParameterBlock> =
+                vec![ffi::ParameterBlock::from_var(&vars[0])];
 
             manager.add_cost(
                 |_constants, parameters, residuals, jacobians| unsafe {
-                    *residuals.offset(0) = 10.0 - *(*parameters.offset(0)).offset(0);
+                    let x = *(*parameters.offset(0)).offset(0);
+
+                    fn f<T: num_traits::Float>(x: T) -> T {
+                        T::from(10.0).unwrap() - x
+                    }
+
+                    let fx = f(autodiff::F1::var(x));
+                    *residuals.offset(0) = f(x);
+
                     if !jacobians.is_null() && !(*jacobians.offset(0)).is_null() {
-                        *(*jacobians.offset(0)).offset(0) = -1.0;
+                        *(*jacobians.offset(0)).offset(0) = fx.deriv();
                     }
                     true
                 },

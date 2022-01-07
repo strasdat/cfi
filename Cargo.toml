@@ -11,6 +11,8 @@ links = "ceres"
 
 [dependencies]
 cxx = "1.0"
+autodiff = "0.4.0"
+num-traits = "0.2.14"
 
 [build-dependencies]
 cxx-build = "1.0"
