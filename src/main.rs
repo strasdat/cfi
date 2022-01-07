@@ -1,9 +1,9 @@
-use ffi::DecisionVariable;
-
 // src/main.rs
 
 #[cxx::bridge]
 mod ffi {
+
+    #[derive(Debug)]
     struct DecisionVariable {
         v: Vec<f64>,
     }
@@ -11,6 +11,11 @@ mod ffi {
     struct ParameterBlock {
         size: i32,
         ptr: *const f64,
+    }
+
+    struct Result {
+        summary: UniquePtr<SolverSummary>,
+        result: Vec<DecisionVariable>,
     }
 
     unsafe extern "C++" {
@@ -35,7 +40,7 @@ mod ffi {
         fn solve(
             options: &UniquePtr<SolverOptions>,
             problem: &mut UniquePtr<Problem>,
-        ) -> UniquePtr<SolverSummary>;
+        ) -> UniquePtr<Result>;
 
         type CostManager;
 
@@ -60,16 +65,16 @@ fn main() {
     let mut problem = ffi::new_problem_from_variables(vec![ffi::DecisionVariable { v: vec![0.5] }]);
 
     problem.pin_mut().add_cost_terms(
-        |manager: core::pin::Pin<&mut ffi::CostManager>, vars: &Vec<DecisionVariable>| {
-            let parameter_blocks: Vec<ffi::ParameterBlock> = vec!(ffi::ParameterBlock {
+        |manager: core::pin::Pin<&mut ffi::CostManager>, vars: &Vec<ffi::DecisionVariable>| {
+            let parameter_blocks: Vec<ffi::ParameterBlock> = vec![ffi::ParameterBlock {
                 size: vars[0].v.len() as i32,
                 ptr: vars[0].v.as_ptr(),
-            });
+            }];
 
             manager.add_cost(
                 |_constants, parameters, residuals, jacobians| unsafe {
                     *residuals.offset(0) = 10.0 - *(*parameters.offset(0)).offset(0);
-                    if !jacobians.is_null() &&  !(*jacobians.offset(0)).is_null() {
+                    if !jacobians.is_null() && !(*jacobians.offset(0)).is_null() {
                         *(*jacobians.offset(0)).offset(0) = -1.0;
                     }
                     true
@@ -80,7 +85,8 @@ fn main() {
         },
     );
 
-    let summary = ffi::solve(&options, &mut problem);
+    let result = ffi::solve(&options, &mut problem);
 
-    summary.print();
+    result.summary.print();
+    println!("{:?}", result.result);
 }

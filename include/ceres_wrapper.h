@@ -5,6 +5,7 @@
 
 struct DecisionVariable;
 struct ParameterBlock;
+struct Result;
 
 class CostManager {
 public:
@@ -51,6 +52,6 @@ public:
   ceres::Solver::Summary solver_summary;
 };
 
-std::unique_ptr<SolverSummary>
+std::unique_ptr<Result>
 solve(const std::unique_ptr<SolverOptions> &options,
       std::unique_ptr<Problem> &problem) noexcept;
